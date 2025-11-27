@@ -1,0 +1,72 @@
+version: "2"
+run:
+  tests: false
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false
+  fix: true
+  uniq-by-line: true
+  whole-files: false
+linters:
+  default: all
+  # enable:
+  #   - bodyclose
+  #   - exhaustive
+  #   - goconst
+  #   - godot
+  #   - gomoddirectives
+  #   - goprintffuncname
+  #   - gosec
+  #   - misspell
+  #   - nakedret
+  #   - nestif
+  #   - nilerr
+  #   - noctx
+  #   - nolintlint
+  #   - prealloc
+  #   - revive
+  #   - rowserrcheck
+  #   - sqlclosecheck
+  #   - tparallel
+  #   - unconvert
+  #   - unparam
+  #   - whitespace
+  #   - wrapcheck
+
+  settings:
+    depguard:
+      rules:
+        main:
+          allow:
+            - $gostd
+            - github.com/grzadr/subgonverter/
+            - modernc.org
+  exclusions:
+    rules:
+      - text: '(slog|log)\.\w+'
+        linters:
+          - noctx
+    generated: lax
+    presets:
+      - common-false-positives
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+    - goimports
+    - golines
+  settings:
+    golines:
+      max-len: 80
+      shorten-comments: true
+      reformat-tags: false
+    gofumpt:
+      extra-rules: true
+    gofmt:
+      rewrite-rules:
+        - pattern: "interface{}"
+          replacement: "any"
+  exclusions:
+    generated: lax
