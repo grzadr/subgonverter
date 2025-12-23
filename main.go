@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 )
 
 const bufferSize = 256 * 1024
@@ -36,6 +38,25 @@ func processFileLines[R any](
 	return nil
 }
 
+type FileFormat uint8
+
+const (
+	UnknownFormat FileFormat = iota
+	TxtFormat
+	SrtFormat
+)
+
+type Arguments struct {
+	InputPath    string
+	InputFormat  FileFormat
+	OutputFormat FileFormat
+}
+
+func ParseArguments() (args Arguments, err error) {
+	return args, err
+}
+
 func main() {
-	fmt.Println("Hello")
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 }
