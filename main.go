@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"io"
+	"log"
 	"os"
 	"os/signal"
 )
@@ -46,17 +48,31 @@ const (
 	SrtFormat
 )
 
-type Arguments struct {
+type MainConfig struct {
 	InputPath    string
 	InputFormat  FileFormat
 	OutputFormat FileFormat
 }
 
-func ParseArguments() (args Arguments, err error) {
-	return args, err
+func ParseArguments(args []string) (parsed MainConfig, err error) {
+	return parsed, err
+}
+
+func InitReader(path string) (reader io.Reader, err error) {
+	return reader, err
 }
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
+
+	config, err := ParseArguments(os.Args[1:])
+	if err != nil {
+		log.Fatalf("failed to parse arguments: %s", err)
+	}
+
+	reader, err := InitReader(config.InputPath)
+	if err != nil {
+		log.Fatalf("failed to initialize input read: %s", err)
+	}
 }
