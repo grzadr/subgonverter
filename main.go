@@ -3,14 +3,18 @@ package main
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"log"
 	"os"
 	"os/signal"
 )
 
 const bufferSize = 256 * 1024
+
+var ErrNotImplemented = errors.New("not implemented")
 
 func processFileLines[R any](
 	filename string,
@@ -54,12 +58,23 @@ type MainConfig struct {
 	OutputFormat FileFormat
 }
 
+type Subtitle struct{}
+
 func ParseArguments(args []string) (parsed MainConfig, err error) {
 	return parsed, err
 }
 
 func InitReader(path string) (reader io.Reader, err error) {
 	return reader, err
+}
+
+func TransformInput(
+	ctx context.Context,
+	reader io.Reader,
+) iter.Seq2[Subtitle, error] {
+	return func(yield func(Subtitle, error) bool) {
+		return
+	}
 }
 
 func main() {
