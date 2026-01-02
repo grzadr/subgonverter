@@ -107,30 +107,71 @@ func InitWriter(path string) (io.Writer, func() error, error) {
 	return bw, cleanup, nil
 }
 
-func IterateSubtitles(
-	reader io.Reader,
-	format FileFormat,
-) iter.Seq2[Subtitle, error] {
+func NewScannerPull(reader io.Reader) (
+	next func() (string, error, bool),
+	stop func(),
+) {
 	scanner := bufio.NewScanner(reader)
 
 	buf := make([]byte, 0, bufferSize)
 	scanner.Buffer(buf, bufferSize)
 
-	for scanner.Scan() {
-		if err := process(scanner.Text()); err != nil {
-			return fmt.Errorf("failed to process line: %w", err)
+	return iter.Pull2(func(yield func(string, error) bool) {
+		for scanner.Scan() {
+			if !yield(scanner.Text(), nil) {
+				return
+			}
 		}
-	}
 
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scanner error: %w", err)
-	}
+		if err := scanner.Err(); err != nil {
+			yield("", err)
+		}
+	})
+}
 
-	return nil
-
+func NewTxtSubtitlesIter(
+	next func() (string, error, bool),
+	stop func(),
+) iter.Seq2[Subtitle, error] {
 	return func(yield func(Subtitle, error) bool) {
+		defer stop()
+
+		for {
+			line, err, ok := next()
+			if !ok {
+				break
+			}
+			if err != nil {
+				return fmt.Errorf("scan: %w", err)
+			}
+
+			if err := process(line); err != nil {
+				return fmt.Errorf("process: %w", err)
+			}
+		}
+
 		yield(Subtitle{}, errNotImplemented)
 		return
+	}
+}
+
+func NewSubtitlesIter(
+	reader io.Reader,
+	format FileFormat,
+) iter.Seq2[Subtitle, error] {
+	next, stop := NewScannerPull(reader)
+
+	switch format {
+	case TxtFormat:
+		return NewTxtSubtitlesIter(next, stop)
+
+	default:
+		return func(yield func(Subtitle, error) bool) {
+			defer stop()
+
+			yield(Subtitle{}, errNotImplemented)
+			return
+		}
 	}
 }
 
@@ -165,7 +206,7 @@ func process(
 	}
 	defer wcloser()
 
-	for sub, err := range IterateSubtitles(reader, config.InputFormat) {
+	for sub, err := range NewSubtitlesIter(reader, config.InputFormat) {
 
 		if err != nil {
 			fmt.Errorf("failed to parse subtitle: %s", err)
