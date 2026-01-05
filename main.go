@@ -17,34 +17,6 @@ const bufferSize = 256 * 1024
 
 var errNotImplemented = errors.New("not implemented")
 
-func processFileLines[R any](
-	filename string,
-	process func(string) (R, error),
-) (R, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file: %w", err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-
-	buf := make([]byte, 0, bufferSize)
-	scanner.Buffer(buf, bufferSize)
-
-	for scanner.Scan() {
-		if err := process(scanner.Text()); err != nil {
-			return fmt.Errorf("failed to process line: %w", err)
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("scanner error: %w", err)
-	}
-
-	return nil
-}
-
 type FileFormat uint8
 
 const (
@@ -64,6 +36,10 @@ type Subtitle struct {
 	Start time.Duration
 	End   time.Duration
 	Text  string
+}
+
+func NewSubtitleFromTxt(line string) (sub Subtitle, err error) {
+	return sub, errNotImplemented
 }
 
 func ParseArguments(args []string) (parsed MainConfig, err error) {
@@ -139,19 +115,29 @@ func NewTxtSubtitlesIter(
 		for {
 			line, err, ok := next()
 			if !ok {
-				break
+				return
 			}
 			if err != nil {
-				return fmt.Errorf("scan: %w", err)
+				yield(
+					Subtitle{},
+					fmt.Errorf("error reading txt subtitle: %w", err),
+				)
+				return
 			}
 
-			if err := process(line); err != nil {
-				return fmt.Errorf("process: %w", err)
+			sub, err := NewSubtitleFromTxt(line)
+			if err != nil {
+				yield(
+					Subtitle{},
+					fmt.Errorf("error parsing txt subtitle: %w", err),
+				)
+				return
+			}
+
+			if !yield(sub, err) {
+				return
 			}
 		}
-
-		yield(Subtitle{}, errNotImplemented)
-		return
 	}
 }
 
@@ -170,19 +156,18 @@ func NewSubtitlesIter(
 			defer stop()
 
 			yield(Subtitle{}, errNotImplemented)
-			return
 		}
 	}
 }
 
-func WriteSubtitle(
+func NewSubtitleWriter(
 	writer io.Writer,
-	sub Subtitle,
 	format FileFormat,
-) error {
+) (func(sub Subtitle) error, error) {
 	switch format {
 	case SrtFormat:
-		return errNotImplemented
+
+		return
 	case TxtFormat:
 		return errNotImplemented
 	default:
@@ -196,20 +181,20 @@ func process(
 ) error {
 	reader, rcloser, err := InitReader(config.InputPath)
 	if err != nil {
-		fmt.Errorf("failed to initialize input reader: %w", err)
+		return fmt.Errorf("failed to initialize input reader: %w", err)
 	}
 	defer rcloser()
 
 	writer, wcloser, err := InitWriter(config.OutputPath)
 	if err != nil {
-		fmt.Errorf("failed to initialize output writer: %w", err)
+		return fmt.Errorf("failed to initialize output writer: %w", err)
 	}
 	defer wcloser()
 
 	for sub, err := range NewSubtitlesIter(reader, config.InputFormat) {
 
 		if err != nil {
-			fmt.Errorf("failed to parse subtitle: %s", err)
+			return fmt.Errorf("failed to parse subtitle: %s", err)
 		}
 
 		if err := ctx.Err(); err != nil {
@@ -234,6 +219,6 @@ func main() {
 	}
 
 	if err := process(ctx, config); err != nil {
-		log.Fatalf("processing failed: %w", err)
+		log.Fatalf("processing failed: %v", err)
 	}
 }
