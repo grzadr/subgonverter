@@ -163,15 +163,14 @@ func NewSubtitlesIter(
 func NewSubtitleWriter(
 	writer io.Writer,
 	format FileFormat,
-) (func(sub Subtitle) error, error) {
+) func(sub Subtitle) error {
 	switch format {
 	case SrtFormat:
-
-		return
+		return nil
 	case TxtFormat:
-		return errNotImplemented
+		return nil
 	default:
-		return errors.New("unknown output file format")
+		return nil
 	}
 }
 
