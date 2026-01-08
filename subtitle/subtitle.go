@@ -71,6 +71,23 @@ func writeTxtDuration(w io.Writer, d time.Duration) error {
 	return err
 }
 
+func writeTxtSubtitle(w io.Writer, sub Subtitle) error {
+	var err error
+
+	if err = writeTxtDuration(w, sub.Start); err != nil {
+		return err
+	}
+
+	if err = writeTxtDuration(w, sub.End); err != nil {
+		return err
+	}
+
+	text := strings.ReplaceAll(sub.Text, "\n", "|")
+	_, err = fmt.Fprintln(w, text)
+
+	return err
+}
+
 func writeSrtDuration(w io.Writer, d time.Duration) error {
 	hours := d / time.Hour
 	minutes := (d % time.Hour) / time.Minute
@@ -136,7 +153,9 @@ func NewSubtitlePrinter(
 			return writeSrtSubtitle(writer, sub, n)
 		}
 	case TxtFormat:
-		return nil
+		return func(sub Subtitle) error {
+			return writeTxtSubtitle(writer, sub)
+		}
 	default:
 		return nil
 	}
