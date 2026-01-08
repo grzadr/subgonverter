@@ -1,8 +1,10 @@
-.PHONY: all test lint build clean
+.PHONY: all test test-verbose test-coverage coverage-html lint build clean
 
 # Binary name and output directory
 BINARY_NAME=subgonverter
 BIN_DIR=bin
+COVERAGE_DIR=coverage
+COVERAGE_FILE=$(COVERAGE_DIR)/coverage.out
 
 # Default target
 all: build
@@ -19,6 +21,26 @@ test:
 	@echo "Running tests..."
 	go test ./...
 
+# Run tests with verbose output
+test-verbose:
+	@echo "Running tests (verbose)..."
+	go test -v ./...
+
+# Run tests with coverage
+test-coverage:
+	@echo "Running tests with coverage..."
+	@mkdir -p $(COVERAGE_DIR)
+	go test -cover -coverprofile=$(COVERAGE_FILE) ./...
+	@echo ""
+	@echo "Coverage by function:"
+	@go tool cover -func=$(COVERAGE_FILE)
+
+# Generate HTML coverage report and open in browser
+coverage-html: test-coverage
+	@echo "Generating HTML coverage report..."
+	go tool cover -html=$(COVERAGE_FILE) -o $(COVERAGE_DIR)/coverage.html
+	@echo "Coverage report generated at $(COVERAGE_DIR)/coverage.html"
+
 # Run golangci-lint
 lint:
 	@echo "Running golangci-lint..."
@@ -27,5 +49,5 @@ lint:
 # Clean build artifacts
 clean:
 	@echo "Cleaning..."
-	rm -rf $(BIN_DIR)
+	rm -rf $(BIN_DIR) $(COVERAGE_DIR)
 	@echo "Clean complete"
