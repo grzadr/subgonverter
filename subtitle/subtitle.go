@@ -103,11 +103,12 @@ func writeSrtSubtitle(w io.Writer, sub Subtitle, n int) error {
 		return err
 	}
 
-	if err = writeSrtDuration(w, sub.Start); err != nil {
+	if err = writeSrtDuration(w, sub.End); err != nil {
 		return err
 	}
 
-	_, err = fmt.Fprintln(w, "\n", sub.Text)
+	_, err = fmt.Fprintf(w, "\n%s\n\n", sub.Text)
+
 	return err
 }
 
