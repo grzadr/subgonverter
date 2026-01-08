@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -24,7 +25,31 @@ type MainConfig struct {
 }
 
 func ParseArguments(args []string) (parsed MainConfig, err error) {
-	return parsed, subtitle.ErrNotImplemented
+	fs := flag.NewFlagSet("subgonverter", flag.ContinueOnError)
+
+	outputPath := fs.String("o", "-", "output file path (default: stdout)")
+	fs.String("output", "-", "output file path (default: stdout)")
+
+	if err := fs.Parse(args); err != nil {
+		return parsed, fmt.Errorf("failed to parse flags: %w", err)
+	}
+
+	// Set defaults
+	parsed.InputFormat = subtitle.TxtFormat
+	parsed.OutputPath = *outputPath
+	parsed.OutputFormat = subtitle.SrtFormat
+
+	// Handle the output flag (both -o and --output should work)
+	if output := fs.Lookup("output").Value.String(); output != "-" {
+		parsed.OutputPath = output
+	}
+
+	// Get optional positional argument for input file
+	if fs.NArg() > 0 {
+		parsed.InputPath = fs.Arg(0)
+	}
+
+	return parsed, nil
 }
 
 func InitReader(path string) (io.Reader, func() error, error) {
