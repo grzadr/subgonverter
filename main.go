@@ -13,7 +13,13 @@ import (
 	"time"
 )
 
-const bufferSize = 256 * 1024
+const (
+	readBufferSize  = 256 * 1024
+	writeBufferSize = 256 * 1024
+	ntscRateNum     = 24000
+	ntscRateDen     = 1001
+	ntscRateDiv     = 1000
+)
 
 var errNotImplemented = errors.New("not implemented")
 
@@ -32,6 +38,35 @@ type MainConfig struct {
 	OutputFormat FileFormat
 }
 
+func WriteTxtDuration(w io.Writer, d time.Duration) error {
+	div := int64(ntscRateDen * ntscRateDiv)
+	frame := (d.Milliseconds()*ntscRateNum + div/2) / div
+	_, err := fmt.Fprintf(
+		w,
+		"{%d}",
+		frame,
+	)
+
+	return err
+}
+
+func WriteSrtDuration(w io.Writer, d time.Duration) error {
+	hours := d / time.Hour
+	minutes := (d % time.Hour) / time.Minute
+	seconds := (d % time.Minute) / time.Second
+	millis := (d % time.Second) / time.Millisecond
+	_, err := fmt.Fprintf(
+		w,
+		"%02d:%02d:%02d,%03d",
+		hours,
+		minutes,
+		seconds,
+		millis,
+	)
+
+	return err
+}
+
 type Subtitle struct {
 	Start time.Duration
 	End   time.Duration
@@ -40,6 +75,34 @@ type Subtitle struct {
 
 func NewSubtitleFromTxt(line string) (sub Subtitle, err error) {
 	return sub, errNotImplemented
+}
+
+// 105
+// 00:10:53,987 --> 00:10:58,658
+// koniec ludzkiej historii
+// osiągnięć naukowych!
+
+func WriteSubtitleSrt(w io.Writer, sub Subtitle, n int) error {
+	var err error
+
+	if _, err = fmt.Fprintln(w, n); err != nil {
+		return err
+	}
+
+	if err = WriteSrtDuration(w, sub.Start); err != nil {
+		return err
+	}
+
+	if _, err = fmt.Fprint(w, " --> "); err != nil {
+		return err
+	}
+
+	if err = WriteSrtDuration(w, sub.Start); err != nil {
+		return err
+	}
+
+	_, err = fmt.Fprintln(w, "\n", sub.Text)
+	return err
 }
 
 func ParseArguments(args []string) (parsed MainConfig, err error) {
@@ -59,6 +122,24 @@ func InitReader(path string) (io.Reader, func() error, error) {
 	return file, file.Close, nil
 }
 
+func NewSubtitlePrinter(
+	writer io.Writer,
+	format FileFormat,
+) func(sub Subtitle) error {
+	switch format {
+	case SrtFormat:
+		n := 0
+		return func(sub Subtitle) error {
+			n++
+			return WriteSubtitleSrt(writer, sub, n)
+		}
+	case TxtFormat:
+		return nil
+	default:
+		return nil
+	}
+}
+
 func InitWriter(path string) (io.Writer, func() error, error) {
 	if path == "" || path == "-" {
 		bw := bufio.NewWriter(os.Stdout)
@@ -70,7 +151,7 @@ func InitWriter(path string) (io.Writer, func() error, error) {
 		return nil, nil, err
 	}
 
-	bw := bufio.NewWriterSize(file, bufferSize)
+	bw := bufio.NewWriterSize(file, writeBufferSize)
 
 	cleanup := func() error {
 		if err := bw.Flush(); err != nil {
@@ -89,8 +170,8 @@ func NewScannerPull(reader io.Reader) (
 ) {
 	scanner := bufio.NewScanner(reader)
 
-	buf := make([]byte, 0, bufferSize)
-	scanner.Buffer(buf, bufferSize)
+	buf := make([]byte, 0, readBufferSize)
+	scanner.Buffer(buf, readBufferSize)
 
 	return iter.Pull2(func(yield func(string, error) bool) {
 		for scanner.Scan() {
@@ -160,20 +241,6 @@ func NewSubtitlesIter(
 	}
 }
 
-func NewSubtitleWriter(
-	writer io.Writer,
-	format FileFormat,
-) func(sub Subtitle) error {
-	switch format {
-	case SrtFormat:
-		return nil
-	case TxtFormat:
-		return nil
-	default:
-		return nil
-	}
-}
-
 func process(
 	ctx context.Context,
 	config MainConfig,
@@ -190,6 +257,8 @@ func process(
 	}
 	defer wcloser()
 
+	print := NewSubtitlePrinter(writer, config.OutputFormat)
+
 	for sub, err := range NewSubtitlesIter(reader, config.InputFormat) {
 
 		if err != nil {
@@ -200,7 +269,7 @@ func process(
 			return err
 		}
 
-		if err := WriteSubtitle(writer, sub, config.OutputFormat); err != nil {
+		if err := print(sub); err != nil {
 			return fmt.Errorf("failed to write subtitle: %w", err)
 		}
 	}
